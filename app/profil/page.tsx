@@ -1,68 +1,78 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-degistir";
-
 export default async function ProfilPage() {
-  // Next 16: cookies() -> Promise, o yüzden await!
   const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
+  const userEmail = cookieStore.get("user_email")?.value;
 
-  if (!token) {
-    redirect("/giris");
-  }
-
-  let userId: number | null = null;
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId?: number };
-    userId = decoded.userId ?? null;
-  } catch {
-    redirect("/giris");
-  }
-
-  if (!userId) {
-    redirect("/giris");
+  if (!userEmail) {
+    redirect("/giris-yap");
   }
 
   const user = await prisma.user.findUnique({
-    where: { id: userId },
+    where: { email: userEmail },
     select: {
       name: true,
       email: true,
-      type: true, // 🔹 burada userType değil, type
+      phone: true,
+      createdAt: true,
+      _count: {
+        select: {
+          listings: true,
+        },
+      },
     },
   });
 
   if (!user) {
-    redirect("/giris");
+    redirect("/giris-yap");
   }
 
-  const typeLabel = user.type === "kurumsal" ? "Kurumsal" : "Bireysel";
-
   return (
-    <main className="min-h-screen bg-slate-900 flex items-center justify-center px-4">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-950 p-6 shadow-xl">
-        <h1 className="text-xl font-bold text-slate-50 mb-4">
-          Profil <span className="text-[#00acc1]">bilgileriniz</span>
-        </h1>
+    <main className="min-h-screen bg-[#06131d] px-4 py-10 text-white">
+      <div className="mx-auto max-w-4xl">
+        <h1 className="text-4xl font-extrabold">Profilim</h1>
+        <p className="mt-2 text-slate-400">
+          Hesap bilgilerin ve ilan özetin.
+        </p>
 
-        <dl className="space-y-3 text-sm text-slate-200">
-          <div>
-            <dt className="text-xs text-slate-400">Ad Soyad</dt>
-            <dd className="font-semibold">{user.name}</dd>
+        <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <div className="text-sm text-slate-400">Ad Soyad</div>
+              <div className="mt-1 text-lg font-semibold">
+                {user.name || "Belirtilmedi"}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm text-slate-400">E-posta</div>
+              <div className="mt-1 text-lg font-semibold">{user.email}</div>
+            </div>
+
+            <div>
+              <div className="text-sm text-slate-400">Telefon</div>
+              <div className="mt-1 text-lg font-semibold">
+                {user.phone || "Belirtilmedi"}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm text-slate-400">İlan Sayısı</div>
+              <div className="mt-1 text-lg font-semibold">
+                {user._count.listings}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm text-slate-400">Kayıt Tarihi</div>
+              <div className="mt-1 text-lg font-semibold">
+                {user.createdAt.toLocaleDateString("tr-TR")}
+              </div>
+            </div>
           </div>
-          <div>
-            <dt className="text-xs text-slate-400">E-posta</dt>
-            <dd>{user.email}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-400">Tip</dt>
-            <dd>{typeLabel}</dd>
-          </div>
-        </dl>
+        </div>
       </div>
     </main>
   );

@@ -33,12 +33,15 @@ export async function POST(req: NextRequest) {
 
     if (existingUser) {
       return NextResponse.json(
-        { success: false, message: "Bu e-posta ile kayıtlı bir kullanıcı zaten var." },
+        {
+          success: false,
+          message: "Bu e-posta ile kayıtlı bir kullanıcı zaten var.",
+        },
         { status: 409 }
       );
     }
 
-    const passwordHash = hashPassword(password);
+    const passwordHash = await hashPassword(password);
 
     await prisma.user.create({
       data: {

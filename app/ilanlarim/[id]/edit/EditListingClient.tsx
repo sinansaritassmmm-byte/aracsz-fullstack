@@ -169,7 +169,9 @@ export default function EditListingClient({ listingId }: { listingId: string }) 
       fd.set("replaceImages", replaceImages ? "1" : "0");
 
       // silinecek mevcut görseller
-      for (const id of deleteImageIds) fd.append("deleteImageIds", id);
+      Array.from(deleteImageIds).forEach((id) => {
+  fd.append("deleteImageIds", id);
+});
 
       // yeni görseller
       newFiles.forEach((f) => fd.append("images", f));

@@ -37,8 +37,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
         city: true,
         district: true,
-        location: true,
-
+        
         vehicleYear: true,
         vehicleKm: true,
         vehicleFuel: true,
@@ -76,8 +75,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
         city: listing.city,
         district: listing.district,
-        location: listing.location,
-
+        
         vehicleYear: listing.vehicleYear,
         vehicleKm: listing.vehicleKm,
         vehicleFuel: listing.vehicleFuel,
