@@ -1,0 +1,76 @@
+// prisma/schema.prisma
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+}
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  phone        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  listings Listing[]
+}
+
+model Listing {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  price       Int?
+  category    String
+  userId      String
+  status      ListingStatus @default(DRAFT)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // ✅ Yeni filtre alanları
+  categoryMain String?   // Vasıta | Tarım & Hayvancılık | Emlak | Elektronik & Diğer
+  categorySub  String?   // Otomobil | SUV | Kamyon | Traktör | Daire | Telefon ...
+  brand        String?   // Renault, Fiat, Apple...
+  modelName    String?   // Clio, Egea, iPhone 14...
+  city         String?   // İstanbul
+  district     String?   // Kadıköy
+ // ✅ Vasıta özel alanlar
+  vehicleYear     Int?
+  vehicleKm       Int?
+  vehicleFuel     String? // Benzin | Dizel | LPG | Hibrit | Elektrik
+  vehicleGear     String? // Manuel | Otomatik | Yarı Otomatik
+
+  @@index([vehicleYear])
+  @@index([vehicleFuel])
+  @@index([vehicleGear])
+  
+  images      ListingImage[]
+  user        User @relation(fields: [userId], references: [id])
+
+  @@index([status])
+  @@index([categoryMain])
+  @@index([categorySub])
+  @@index([brand])
+  @@index([city, district])
+}
+
+
+
+
+model ListingImage {
+  id  String @id @default(cuid())
+  url String
+
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+}
