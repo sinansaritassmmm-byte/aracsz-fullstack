@@ -1,91 +1,90 @@
 ﻿import Link from "next/link";
-import ListingCard from "./_components/ListingCard";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 const categories = [
   {
     title: "Araç",
     desc: "Otomobil, ticari, motosiklet ve daha fazlası",
-    href: "/ilanlar?categoryMain=arac",
+    href: "/kategori/arac",
     icon: "🚗",
-    count: "12.450+ ilan",
+    key: "Araç",
   },
   {
     title: "Emlak",
     desc: "Satılık, kiralık, arsa ve işyeri ilanları",
-    href: "/ilanlar?categoryMain=emlak",
+    href: "/kategori/emlak",
     icon: "🏠",
-    count: "8.320+ ilan",
+    key: "Emlak",
   },
   {
-    title: "Tarım & Hayvancılık",
+    title: "Tarım",
     desc: "Traktör, ekipman, yem ve canlı hayvan",
-    href: "/ilanlar?categoryMain=tarim",
+    href: "/kategori/tarim",
     icon: "🚜",
-    count: "3.180+ ilan",
+    key: "Tarım",
   },
   {
     title: "Elektronik",
     desc: "Telefon, bilgisayar, ekipman ve aksesuar",
-    href: "/ilanlar?categoryMain=elektronik",
+    href: "/kategori/elektronik",
     icon: "💻",
-    count: "5.940+ ilan",
+    key: "Elektronik",
   },
 ];
 
-const featuredListings = [
-  {
-    id: 1,
-    title: "2020 Renault Clio 1.0 TCe Icon",
-    price: "875.000 TL",
-    location: "İstanbul",
-    meta: "78.000 km • Benzin • Otomatik",
-    featured: true,
-  },
-  {
-    id: 2,
-    title: "Satılık 2+1 Daire",
-    price: "2.450.000 TL",
-    location: "Bursa / Nilüfer",
-    meta: "110 m² • 2+1 • 3. Kat",
-    featured: true,
-  },
-  {
-    id: 3,
-    title: "John Deere 5075E Traktör",
-    price: "1.320.000 TL",
-    location: "Konya",
-    meta: "2021 model • Düşük saat",
-    featured: false,
-  },
-  {
-    id: 4,
-    title: "MacBook Pro 14 M2",
-    price: "54.900 TL",
-    location: "Ankara",
-    meta: "Kutulu • Temiz • 16 GB RAM",
-    featured: false,
-  },
-];
+function formatPrice(price: number | null) {
+  if (price === null) return "Fiyat belirtilmedi";
+  return `${price.toLocaleString("tr-TR")} TL`;
+}
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [totalListings, latestListings, categoryCounts] = await Promise.all([
+    prisma.listing.count({
+      where: { status: "PUBLISHED" },
+    }),
+
+    prisma.listing.findMany({
+      where: { status: "PUBLISHED" },
+      include: { images: true },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
+
+    prisma.listing.groupBy({
+      by: ["category"],
+      where: { status: "PUBLISHED" },
+      _count: { category: true },
+    }),
+  ]);
+
+  function getCategoryCount(category: string) {
+    return (
+      categoryCounts.find((item) => item.category === category)?._count
+        .category || 0
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 md:pt-10">
       <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] shadow-2xl">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(0,172,193,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(229,57,53,0.12),transparent_26%)]" />
 
-        <div className="relative grid gap-8 px-6 py-8 md:grid-cols-[1.2fr,0.8fr] md:px-10 md:py-12">
+        <div className="relative grid gap-8 px-6 py-8 md:grid-cols-[1.15fr,0.85fr] md:px-10 md:py-10">
           <div>
             <div className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">
               Türkiye genelinde ilan platformu
             </div>
 
             <h1 className="mt-4 max-w-3xl text-4xl font-extrabold leading-tight text-white md:text-6xl">
-              Türkiye&apos;nin yeni nesil <span className="text-[#00acc1]">ilan pazarı</span>
+              Türkiye&apos;nin yeni nesil{" "}
+              <span className="text-[#00acc1]">ilan pazarı</span>
             </h1>
 
             <p className="mt-4 max-w-2xl text-base leading-7 text-white/70 md:text-lg">
-              Araç, emlak, tarım, elektronik ve daha fazlası için hızlı, sade ve güven veren
-              bir ilan deneyimi.
+              Araç, emlak, tarım, elektronik ve daha fazlası için hızlı, sade
+              ve güven veren bir ilan deneyimi.
             </p>
 
             <form
@@ -106,21 +105,11 @@ export default function HomePage() {
                   className="h-12 rounded-xl border border-white/10 bg-[#132432] px-4 text-sm text-white outline-none"
                   defaultValue=""
                 >
-                  <option value="" className="bg-white text-black">
-                    Kategori seçin
-                  </option>
-                  <option value="arac" className="bg-white text-black">
-                    Araç
-                  </option>
-                  <option value="emlak" className="bg-white text-black">
-                    Emlak
-                  </option>
-                  <option value="tarim" className="bg-white text-black">
-                    Tarım
-                  </option>
-                  <option value="elektronik" className="bg-white text-black">
-                    Elektronik
-                  </option>
+                  <option value="">Kategori seçin</option>
+                  <option value="arac">Araç</option>
+                  <option value="emlak">Emlak</option>
+                  <option value="tarim">Tarım</option>
+                  <option value="elektronik">Elektronik</option>
                 </select>
 
                 <input
@@ -147,28 +136,29 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-1">
+          <div className="grid gap-4">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <div className="text-sm text-white/60">Bugün yayında</div>
-              <div className="mt-2 text-3xl font-bold text-white">29.890+</div>
+              <div className="mt-2 text-3xl font-bold text-white">
+                {totalListings}
+              </div>
               <div className="mt-1 text-sm text-white/60">Aktif ilan</div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-              <div className="text-sm text-white/60">En çok aranan</div>
+              <div className="text-sm text-white/60">Popüler aramalar</div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <span className="rounded-full bg-white/8 px-3 py-1 text-xs text-white/80">
-                  Otomobil
-                </span>
-                <span className="rounded-full bg-white/8 px-3 py-1 text-xs text-white/80">
-                  2+1 Daire
-                </span>
-                <span className="rounded-full bg-white/8 px-3 py-1 text-xs text-white/80">
-                  Traktör
-                </span>
-                <span className="rounded-full bg-white/8 px-3 py-1 text-xs text-white/80">
-                  iPhone
-                </span>
+                {["Otomobil", "Daire", "Traktör", "Telefon", "Bilgisayar"].map(
+                  (item) => (
+                    <Link
+                      key={item}
+                      href={`/ilanlar?q=${encodeURIComponent(item)}`}
+                      className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/80 hover:bg-white/20"
+                    >
+                      {item}
+                    </Link>
+                  )
+                )}
               </div>
             </div>
 
@@ -191,15 +181,19 @@ export default function HomePage() {
       <section className="mt-10">
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-white">Popüler kategoriler</h2>
-            <p className="mt-1 text-sm text-white/65">En çok ziyaret edilen ilan alanları</p>
+            <h2 className="text-2xl font-bold text-white">
+              Popüler kategoriler
+            </h2>
+            <p className="mt-1 text-sm text-white/65">
+              En çok ziyaret edilen ilan alanları
+            </p>
           </div>
 
           <Link
             href="/ilanlar"
             className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
           >
-            Tüm kategoriler
+            Tüm ilanlar
           </Link>
         </div>
 
@@ -214,11 +208,17 @@ export default function HomePage() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-2xl">
                   {item.icon}
                 </div>
-                <div className="text-xs text-white/45">{item.count}</div>
+                <div className="text-xs text-white/45">
+                  {getCategoryCount(item.key)} ilan
+                </div>
               </div>
 
-              <div className="mt-4 text-lg font-semibold text-white">{item.title}</div>
-              <div className="mt-1 text-sm leading-6 text-white/65">{item.desc}</div>
+              <div className="mt-4 text-lg font-semibold text-white">
+                {item.title}
+              </div>
+              <div className="mt-1 text-sm leading-6 text-white/65">
+                {item.desc}
+              </div>
               <div className="mt-4 text-sm font-medium text-[#00acc1] group-hover:text-white">
                 Kategoriye git →
               </div>
@@ -230,8 +230,12 @@ export default function HomePage() {
       <section className="mt-10">
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-white">Öne çıkan ilanlar</h2>
-            <p className="mt-1 text-sm text-white/65">Vitrindeki ilanlardan bazıları</p>
+            <h2 className="text-2xl font-bold text-white">
+              Son eklenen ilanlar
+            </h2>
+            <p className="mt-1 text-sm text-white/65">
+              Yayına alınan en yeni ilanlar
+            </p>
           </div>
 
           <Link
@@ -242,40 +246,99 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {featuredListings.map((item) => (
-            <ListingCard
-              key={item.id}
-              id={item.id}
-              title={item.title}
-              price={item.price}
-              location={item.location}
-              meta={item.meta}
-              featured={item.featured}
-            />
-          ))}
-        </div>
+        {latestListings.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+            <div className="text-xl font-bold text-white">
+              Henüz yayınlanmış ilan yok
+            </div>
+            <p className="mt-2 text-sm text-white/60">
+              İlk ilan yayınlandığında burada görünecek.
+            </p>
+            <Link
+              href="/ilan-ver"
+              className="mt-5 inline-flex rounded-xl bg-[#e53935] px-5 py-3 text-sm font-bold text-white"
+            >
+              İlk ilanı ver
+            </Link>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {latestListings.map((listing) => {
+              const image = listing.images[0]?.url;
+
+              return (
+                <Link
+                  key={listing.id}
+                  href={`/ilan/${listing.id}`}
+                  className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 transition hover:-translate-y-0.5 hover:bg-white/10"
+                >
+                  <div className="h-44 bg-[#0b2233]">
+                    {image ? (
+                      <img
+                        src={image}
+                        alt={listing.title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-sm text-white/35">
+                        Fotoğraf yok
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4">
+                    <div className="mb-2 text-xs font-semibold text-[#00acc1]">
+                      {listing.categorySub || listing.category}
+                    </div>
+
+                    <h3 className="line-clamp-2 min-h-[48px] text-base font-bold text-white">
+                      {listing.title}
+                    </h3>
+
+                    <div className="mt-3 text-xl font-extrabold text-[#00acc1]">
+                      {formatPrice(listing.price)}
+                    </div>
+
+                    <div className="mt-2 text-sm text-white/55">
+                      {listing.city || "Şehir belirtilmedi"}
+                      {listing.district ? ` / ${listing.district}` : ""}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <section className="mt-10 grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <div className="text-lg font-semibold text-white">Kolay ilan yönetimi</div>
+          <div className="text-lg font-semibold text-white">
+            Kolay ilan yönetimi
+          </div>
           <div className="mt-2 text-sm leading-6 text-white/65">
-            İlan oluşturma, düzenleme ve yayınlama süreçlerini sade bir yapıda yönetin.
+            İlan oluşturma, düzenleme ve yayınlama süreçlerini sade bir yapıda
+            yönetin.
           </div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <div className="text-lg font-semibold text-white">Güçlü vitrin yapısı</div>
+          <div className="text-lg font-semibold text-white">
+            Gerçek zamanlı vitrin
+          </div>
           <div className="mt-2 text-sm leading-6 text-white/65">
-            Kategoriler, öne çıkan ilanlar ve filtreleme ile kullanıcıyı sonuca daha hızlı götürün.
+            Yayındaki ilanlar otomatik olarak ana sayfada ve kategori
+            sayfalarında görünür.
           </div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <div className="text-lg font-semibold text-white">Kurumsal görünüm</div>
+          <div className="text-lg font-semibold text-white">
+            Kurumsal görünüm
+          </div>
           <div className="mt-2 text-sm leading-6 text-white/65">
-            Güven veren modern tasarım ile bireysel ve kurumsal kullanıcıları aynı yapıda toplayın.
+            Güven veren modern tasarım ile bireysel ve kurumsal kullanıcıları
+            aynı yapıda toplayın.
           </div>
         </div>
       </section>
