@@ -1,97 +1,113 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
-function getStr(fd: FormData, ...keys: string[]) {
-  for (const k of keys) {
-    const v = fd.get(k);
-    if (v != null) {
-      const s = String(v).trim();
-      if (s) return s;
-    }
-  }
-  return null;
+function cleanString(value: unknown) {
+  const s = String(value || "").trim();
+  return s || null;
 }
 
-function getInt(fd: FormData, ...keys: string[]) {
-  const s = getStr(fd, ...keys);
-  if (!s) return null;
-  const n = Number(s);
-  if (!Number.isFinite(n)) return null;
-  return Math.trunc(n);
+function cleanNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const cleaned = String(value).replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const token = await getToken({ req });
-    const userId = token?.sub;
-    if (!userId) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    const cookieStore = await cookies();
+    const userEmail = cookieStore.get("user_email")?.value;
 
-    const fd = await req.formData();
-
-    const title = getStr(fd, "title");
-    const description = getStr(fd, "description") ?? "";
-    const category = getStr(fd, "category"); // zorunlu
-
-    if (!title) return NextResponse.json({ ok: false, error: "TITLE_REQUIRED" }, { status: 400 });
-    if (!category) return NextResponse.json({ ok: false, error: "CATEGORY_REQUIRED" }, { status: 400 });
-
-    const price = getInt(fd, "price");
-
-    const categoryMain = getStr(fd, "categoryMain", "category_main");
-    const categorySub = getStr(fd, "categorySub", "category_sub");
-    const brand = getStr(fd, "brand", "make");
-    const modelName = getStr(fd, "modelName", "model");
-    const city = getStr(fd, "city");
-    const district = getStr(fd, "district");
-
-    const vehicleYear = getInt(fd, "vehicleYear", "vehicle_year");
-    const vehicleKm = getInt(fd, "vehicleKm", "vehicle_km");
-    const vehicleFuel = getStr(fd, "vehicleFuel", "vehicle_fuel");
-    const vehicleGear = getStr(fd, "vehicleGear", "vehicle_gear");
-
-    const data: any = {
-      userId,
-      title,
-      description: description || "",
-      category,
-      price,
-
-      categoryMain,
-      categorySub,
-      brand,
-      modelName,
-      city,
-      district,
-
-      vehicleYear,
-      vehicleKm,
-      vehicleFuel,
-      vehicleGear,
-
-      // ✅ status SET ETMİYORUZ: schema default(DRAFT) çalışsın
-    };
-
-    // Dosyalar (Cloudinary akışın varsa burada URL üretip ListingImage createMany yaparsın)
-    const files = fd.getAll("images").filter((x) => x instanceof File) as File[];
-    const listing = await prisma.listing.create({ data });
-
-    // TODO: upload -> url (sende başka yerde olabilir)
-    if (files.length) {
-      // const urls = await uploadFiles(files);
-      // await prisma.listingImage.createMany({ data: urls.map((url) => ({ listingId: listing.id, url })) });
+    if (!userEmail) {
+      return NextResponse.json(
+        { ok: false, message: "Giriş yapmadan ilan veremezsin." },
+        { status: 401 }
+      );
     }
 
-    const full = await prisma.listing.findUnique({
-      where: { id: listing.id },
-      include: { images: true, user: { select: { id: true, name: true, email: true } } },
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { id: true },
     });
 
-    return NextResponse.json({ ok: true, listing: full });
-  } catch (e: any) {
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, message: "Kullanıcı bulunamadı." },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json();
+
+    const title = cleanString(body.title);
+    const description = cleanString(body.description) || "";
+    const category = cleanString(body.category);
+    const price = cleanNumber(body.price);
+
+    const imageUrls = Array.isArray(body.imageUrls)
+      ? body.imageUrls.map((x: unknown) => cleanString(x)).filter(Boolean)
+      : [];
+
+    if (!title) {
+      return NextResponse.json({ ok: false, message: "İlan başlığı zorunludur." }, { status: 400 });
+    }
+
+    if (!category) {
+      return NextResponse.json({ ok: false, message: "Kategori zorunludur." }, { status: 400 });
+    }
+
+    if (!price || price <= 0) {
+      return NextResponse.json({ ok: false, message: "Geçerli fiyat girilmelidir." }, { status: 400 });
+    }
+
+    if (imageUrls.length === 0) {
+      return NextResponse.json({ ok: false, message: "En az 1 fotoğraf eklenmelidir." }, { status: 400 });
+    }
+
+    const listing = await prisma.listing.create({
+      data: {
+        userId: user.id,
+        title,
+        description,
+        price,
+        category,
+        status: "PUBLISHED",
+
+        categoryMain: cleanString(body.categoryMain),
+        categorySub: cleanString(body.categorySub),
+        brand: cleanString(body.brand),
+        modelName: cleanString(body.modelName),
+        city: cleanString(body.city),
+        district: cleanString(body.district),
+
+        vehicleYear: cleanNumber(body.vehicleYear),
+        vehicleKm: cleanNumber(body.vehicleKm),
+        vehicleFuel: cleanString(body.vehicleFuel),
+        vehicleGear: cleanString(body.vehicleGear),
+
+        images: {
+          create: imageUrls.map((url: string) => ({ url })),
+        },
+      },
+      include: {
+        images: true,
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      listing,
+    });
+  } catch (error) {
+    console.error("LISTING_CREATE_ERROR", error);
+
     return NextResponse.json(
-      { ok: false, error: "CREATE_FAILED", detail: String(e?.message ?? e) },
+      {
+        ok: false,
+        message: "İlan kaydedilirken bir hata oluştu.",
+        detail: String(error),
+      },
       { status: 500 }
     );
   }
